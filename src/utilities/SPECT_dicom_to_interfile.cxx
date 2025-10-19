@@ -499,6 +499,7 @@ SPECTDICOMData::get_interfile_header(std::string& output_header, const std::stri
   ss << std::endl;
 
   ss << "!GENERAL IMAGE DATA :=" << std::endl;
+  ss << "; orientation frame := patient" << std::endl;
   // We will write planar data as SPECT (i.e. "tomographic") anyway
   ss << "!type of data := Tomographic" << std::endl;
   ss << "imagedata byte order := LITTLEENDIAN" << std::endl;
