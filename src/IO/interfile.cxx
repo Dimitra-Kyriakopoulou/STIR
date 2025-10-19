@@ -58,6 +58,7 @@
 #include "stir/ProjDataInfoBlocksOnCylindricalNoArcCorr.h"
 #include "stir/ProjDataInfoGenericNoArcCorr.h"
 #include "stir/ProjDataInfoSubsetByView.h"
+#include "stir/shared_ptr.h"
 
 using std::cerr;
 using std::endl;
@@ -119,7 +120,20 @@ create_image_and_header_from(InterfileImageHeader& hdr,
                - voxel_size * BasicCoordinate<3, float>(min_indices);
     }
 
-  return new VoxelsOnCartesianGrid<float>(hdr.get_exam_info_sptr(), IndexRange<3>(min_indices, max_indices), origin, voxel_size);
+  
+      // --- Construct image and attach Option-3 OrientationMeta (const-safe: copy ExamInfo by value) ---
+      VoxelsOnCartesianGrid<float>* _stir_img_opt3 =
+          new VoxelsOnCartesianGrid<float>(hdr.get_exam_info_sptr(), IndexRange<3>(min_indices, max_indices), origin, voxel_size);
+      if (_stir_img_opt3->get_exam_info_sptr())
+      {
+        ExamInfo ex(*_stir_img_opt3->get_exam_info_sptr()); // copy to non-const by value
+        shared_ptr<ExamInfo::OrientationMeta> meta(new ExamInfo::OrientationMeta());
+        meta->z_increasing_with_slice_index = (voxel_size.z() >= 0.F);
+        meta->frame = "unknown";
+        ex.set_orientation_metadata(meta);
+        _stir_img_opt3->set_exam_info(ex); // ExamData::set_exam_info(const ExamInfo&)
+      }
+      return _stir_img_opt3;
 }
 
 VoxelsOnCartesianGrid<float>*
@@ -631,7 +645,22 @@ write_basic_interfile_image_header(const string& header_file_name,
     }
 
   write_interfile_time_frame_definitions(output_header, exam_info);
-  write_interfile_energy_windows(output_header, exam_info);
+  
+
+  // --- STIR Option 3: Orientation metadata as comments ---
+  if (const auto m = exam_info.get_orientation_metadata()) {
+    output_header << "; orientation frame := " << (m->frame.empty()?"unknown":m->frame) << "\n";
+    if (!m->rotation_direction.empty())
+      output_header << "; direction of rotation := " << m->rotation_direction << "\n";
+    if (m->start_angle_deg!=0.F)
+      output_header << "; start angle (deg) := " << m->start_angle_deg << "\n";
+    if (m->angular_extent_deg!=0.F)
+      output_header << "; extent of rotation (deg) := " << m->angular_extent_deg << "\n";
+    output_header << "; z increases with slice index := " << (m->z_increasing_with_slice_index?"true":"false") << "\n";
+  }
+  // ---------------------------------------------------------
+
+write_interfile_energy_windows(output_header, exam_info);
   write_interfile_image_data_descriptions(output_header, data_type_descriptions);
 
   for (int i = 1; i <= scaling_factors.get_length(); i++)
