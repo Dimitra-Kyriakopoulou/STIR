@@ -17,11 +17,14 @@
 */
 
 #include "stir/IO/InterfilePDFSHeaderSPECT.h"
+#include "stir/ExamInfo.h"
 #include "stir/ProjDataInfoCylindricalArcCorr.h"
 #include "stir/ProjDataInfoCylindricalNoArcCorr.h"
 #include <numeric>
 #include <functional>
 #include "stir/warning.h"
+#include <algorithm>
+#include <cctype>
 
 using std::pair;
 using std::sort;
@@ -61,6 +64,7 @@ InterfilePDFSHeaderSPECT::post_processing()
   if (InterfileHeader::post_processing() == true)
     return true;
 
+
   // for compatibility with PET code
   data_offset_each_dataset[0] = data_offset;
 
@@ -69,19 +73,19 @@ InterfilePDFSHeaderSPECT::post_processing()
     {
       // use error message with index [1] as that is what the user sees.
       warning("Interfile error: expecting 'matrix axis label[1] := bin coordinate'");
-      return true;
+return true;
     }
   if (matrix_labels[1].size() > 0 && matrix_labels[1] != "axial coordinate")
     {
       // use error message with index [2] as that is what the user sees.
       warning("Interfile error: expecting 'matrix axis label[2] := axial coordinate'");
-      return true;
+return true;
     }
 
   if (extent_of_rotation == double_value_not_set)
     {
       warning("Interfile error: extent of rotation needs to be set");
-      return true;
+return true;
     }
 
   num_bins = matrix_size[0][0];
@@ -100,7 +104,7 @@ InterfilePDFSHeaderSPECT::post_processing()
       if (radius_of_rotation == double_value_not_set)
         {
           warning("Interfile error: radius not set");
-          return true;
+return true;
         }
       for (int i = 0; i < num_views; i++)
         radii[i] = static_cast<float>(radius_of_rotation);
@@ -111,7 +115,7 @@ InterfilePDFSHeaderSPECT::post_processing()
       if (radii_of_rotation.size() != static_cast<std::size_t>(num_views))
         {
           warning("Interfile error: number of projections must be consistent with radius vector length");
-          return true;
+return true;
         }
       for (int i = 0; i < num_views; i++)
         radii[i] = static_cast<float>(radii_of_rotation[i]);
@@ -119,7 +123,7 @@ InterfilePDFSHeaderSPECT::post_processing()
   else
     {
       warning("Interfile error: only circular or non-circular orbits are supported");
-      return true;
+return true;
     }
 
   // somewhat strange values to be compatible with PET
@@ -212,11 +216,34 @@ InterfilePDFSHeaderSPECT::post_processing()
   else
     {
       warning("direction of rotation has to be CW or CCW");
-      return true;
+return true;
     }
   this->data_info_sptr.reset(my_data_info_ptr);
 
   // cerr << data_info_ptr->parameter_info() << endl;
+
+
+// --- STIR orientation metadata (Option 3) : record orientation without changing geometry ---
+if (!is_null_ptr(this->exam_info_sptr)) {
+  auto meta = std::make_shared<ExamInfo::OrientationMeta>();
+  meta->start_angle_deg = static_cast<float>(start_angle);
+  if (extent_of_rotation != double_value_not_set)
+    meta->angular_extent_deg = static_cast<float>(extent_of_rotation);
+
+  std::string dir = direction_of_rotation;
+  std::transform(dir.begin(), dir.end(), dir.begin(),
+                 [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+  if (dir.find("ccw") != std::string::npos)
+    meta->rotation_direction = "CCW";
+  else if (dir.find("cw") != std::string::npos)
+    meta->rotation_direction = "CW";
+
+  // Interfile SPECT PDFS describes scanner-geometry angles
+  meta->frame = "scanner";
+  // No z-order info in PDFS; leave default (true)
+  this->exam_info_sptr->set_orientation_metadata(meta);
+}
+// --- end STIR orientation metadata block ---
 
   return false;
 }
