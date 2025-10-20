@@ -123,6 +123,24 @@ public:
   /*! the returned string is not intended for parsing. */
   std::string parameter_info() const;
 
+
+
+// ---------------- Orientation metadata (Option 3) ----------------
+struct OrientationMeta {
+  // frame of reference: "scanner" or "patient" (empty = unknown)
+  std::string frame;
+  // SPECT acquisition geometry hints
+  float start_angle_deg = 0.F;
+  float angular_extent_deg = 0.F;
+  std::string rotation_direction; // "CW"/"CCW"/empty
+  // image axes bookkeeping
+  bool z_increasing_with_slice_index = true;
+};
+
+inline void set_orientation_metadata(const shared_ptr<OrientationMeta>& m) { this->orientation_metadata_sptr = m; }
+inline shared_ptr<OrientationMeta> get_orientation_metadata() const { return this->orientation_metadata_sptr; }
+// ------------------------------------------------------------------
+
 protected:
   float calibration_factor;
 
@@ -144,6 +162,8 @@ private:
   //! This parameter was initially introduced for scatter simulation
   //! If scatter simulation is not needed, can default to -1
   float up_energy_thres;
+  shared_ptr<OrientationMeta> orientation_metadata_sptr;
+
 };
 
 END_NAMESPACE_STIR
