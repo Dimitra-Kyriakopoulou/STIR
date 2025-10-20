@@ -47,9 +47,23 @@ ExamInfo::parameter_info() const
     }
   s << "number of energy windows:=1\n"
     << "energy window lower level[1] := " << this->get_low_energy_thres() << '\n'
-    << "energy window upper level[1] := " << this->get_high_energy_thres() << '\n';
+        << "energy window upper level[1] := " << this->get_high_energy_thres() << '\n';
 
-  return s.str();
+// ---- Orientation metadata (if present) ----
+if (this->get_orientation_metadata().get()!=NULL) {
+  const auto& m = *this->get_orientation_metadata();
+  s << "; orientation frame := " << (m.frame.empty()? "unknown" : m.frame) << '\n';
+  if (!m.rotation_direction.empty())
+    s << "; direction of rotation := " << m.rotation_direction << '\n';
+  if (m.start_angle_deg != 0.F)
+    s << "; start angle (deg) := " << m.start_angle_deg << '\n';
+  if (m.angular_extent_deg != 0.F)
+    s << "; extent of rotation (deg) := " << m.angular_extent_deg << '\n';
+  s << "; z increases with slice index := "
+    << (m.z_increasing_with_slice_index ? "true" : "false") << '\n';
+}
+return s.str();
+
 }
 
 bool
