@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 ##  set cmd= %cmd% -d ./Debug
 ##  set cmd= %cmd% --os scatter_520_2D.mhdr
 ##
-## the e7tools provide the prompts sinogram in a compressed file-format.
-## STIR can't read that, so you'll have to uncompress it first:
+## the e7tools provide the prompts sinogram in a compressed file-format by default.
+## STIR can't read that, so you'll have to either uncompress or run the initial histogramming without the --compr flag:
 ## VR20 may not always work for uncompressing, you need to try more versions (VG80).
 ## C:\Siemens\PET\bin.win64-VR20\intfcompr.exe -e path\to\compressed\sinogram\filename.mhdr --oe path\to\UNcompressed\sinogram\NEWfilename.mhdr
 
@@ -58,6 +58,15 @@ def DOI_adaption(projdata, DOI_new):
     proj_info.get_scanner().set_average_depth_of_interaction(DOI_new)
     DOI = proj_info.get_scanner().get_average_depth_of_interaction()
     print('New Depth of interaction:', DOI)
+
+def view_offset_adaption(projdata, view_offset):
+    proj_info = projdata.get_proj_data_info()
+
+    VO = proj_info.get_scanner().get_intrinsic_azimuthal_tilt()
+    print('Current view offset (rad):', VO)
+    proj_info.get_scanner().set_intrinsic_azimuthal_tilt(view_offset)
+    VO = proj_info.get_scanner().get_intrinsic_azimuthal_tilt()
+    print('New view offset (rad):', VO)
 
 def check_if_compressed(header_filename):
     with open(header_filename) as f:
@@ -248,6 +257,10 @@ check_if_compressed(prompts_header_filename)
 change_datafilename_in_interfile_header(prompts_header_to_read_withSTIR, prompts_header_filename ,prompts_header_filename[:-4])
 # ## we're ready to read the prompts with STIR now
 prompts_from_e7 = stir.ProjData.read_from_file(prompts_header_to_read_withSTIR)
+###################### DOI ADAPTION ############################
+## after comparing e7tools and STIR forward projections, we've found out we have to change
+## the crystal depth of interaction (DOI) from 7mm to 10mm to minimize the differences.
+if apply_DOI_adaption: DOI_adaption(prompts_from_e7, 10)
 # Directly read as numpy array
 prompts_arr = stirextra.to_numpy(prompts_from_e7)
 # Write on the disk
@@ -278,16 +291,14 @@ change_datatype_in_interfile_header(norm_sino_to_read_withSTIR, 'float', 4)
 #%%
 #### ready to read in norm-sino with STIR
 norm_sino = stir.ProjData.read_from_file(norm_sino_to_read_withSTIR)
-###################### DOI ADAPTION ############################
-## after comparing e7tools and STIR forward projections, we've found out we have to change
-## the crystal depth of interaction (DOI) from 7mm to 10mm to minimize the differences.
+
 if apply_DOI_adaption: DOI_adaption(norm_sino, 10)
 norm_sino_arr = stirextra.to_numpy(norm_sino)
 
 ##### In case there were bad miniblocks during your measurement, the norm-file
 ##### might contain negative values. We'll set them to a very high value here, such
 ##### that the detection efficiencies (1/norm-value) will be 0 (numerically)
-norm_sino_arr[norm_sino_arr<=0.] = 10^37
+norm_sino_arr[norm_sino_arr<=0.] = 10**37
 #### this is the data STIR needs in an Acquisition Sensitivity model, so we'll write it out
 #%%
 norm_sino_STIR = stir.ProjDataInterfile(prompts_from_e7.get_exam_info(), proj_info, os.path.join(STIR_output_folder,norm_filename_fSTIR))
