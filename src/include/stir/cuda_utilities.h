@@ -104,8 +104,10 @@ array_to_host(Array<num_dimensions, elemT>& stir_array, const elemT* dev_data)
 
 template <int num_dimensions, typename elemT>
 inline void
-array_to_host(Array<num_dimensions, elemT>& stir_array, const CuVec<elemT>& dev_data)
+array_to_host(Array<num_dimensions, elemT>& stir_array, const CuVec<elemT>& dev_data, bool sync = true)
 {
+  if (sync)
+    cudaDeviceSynchronize();
   std::copy(dev_data.begin(), dev_data.end(), stir_array.begin_all());
 }
 
